@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>沙盒沙箱模拟器 MD3 - 物理增强版</title>
+    <style>
+        :root {
+            --md-sys-color-primary: #6750A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #EADDFF;
+            --md-sys-color-on-primary-container: #21005D;
+            --md-sys-color-secondary: #625B71;
+            --md-sys-color-secondary-container: #E8DEF8;
+            --md-sys-color-on-secondary-container: #1D192B;
+            --md-sys-color-surface: #1C1B1F;
+            --md-sys-color-surface-container: #25232A;
+            --md-sys-color-on-surface: #E6E1E5;
+            --md-sys-color-outline: #79747E;
+            --md-sys-color-surface-variant: #49454F;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background: var(--md-sys-color-surface);
+            font: 400 22px/28px 'Roboto', sans-serif;
+            justify-content: space-between;
+        }
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--md-sys-color-on-surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .icon-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+        #game-container {
+            flex: 1;
+            position: relative;
+            background: #000;
+            margin: 0 16px 16px 16px;
+            border-radius: 16px;
+            overflow: hidden;
+            touch-action: none;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            display: block;
+        }
+        .controls-area {
+            background: var(--md-sys-color-surface-container);
+            padding: 12px 16px 24px 16px;
+            border-radius: 24px 24px 0 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .chip-scroll {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+        .chip-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .chip {
+            height: 32px;
+            padding: 0 16px;
+            border-radius: 8px;
+            border: 1px solid var(--md-sys-color-outline);
+            background: transparent;
+            color: var(--md-sys-color-on-surface);
+            font: 500 14px/20px 'Roboto', sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .chip.active {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border-color: transparent;
+        }
+        .chip.active::before {
+            content: "✓";
+            margin-right: 6px;
+            font-weight: bold;
+        }
+        #more-sheet {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: var(--md-sys-color-surface-container);
+            border-radius: 28px 28px 0 0;
+            padding: 24px;
+            transition: bottom .3s;
+            z-index: 100;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #more-sheet.open {
+            bottom: 0;
+        }
+        .sheet-handle {
+            width: 32px;
+            height: 4px;
+            background: var(--md-sys-color-outline);
+            opacity: .4;
+            border-radius: 2px;
+            margin: -10px auto 20px auto;
+        }
+        .grid-elements {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 12px;
+        }
+        .element-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: var(--md-sys-color-surface);
+            border-radius: 12px;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .element-color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, .1);
+        }
+        .backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .4);
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s;
+        }
+        .backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .brush-size-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--md-sys-color-surface-variant);
+            border-radius: 2px;
+            outline: none;
+        }
+        .brush-size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--md-sys-color-primary);
+            border: 2px solid var(--md-sys-color-on-primary);
+            cursor: grab;
+            box-shadow: 0 0 4px rgba(0, 0, 0, .35);
+            transition: transform .2s;
+        }
+        .brush-size-slider:active::-webkit-slider-thumb {
+            cursor: grabbing;
+            transform: scale(1.15);
+        }
+        .brush-size-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--md-sys-color-primary);
+            border: 2px solid var(--md-sys-color-on-primary);
+            cursor: grab;
+            box-shadow: 0 0 4px rgba(0, 0, 0, .35);
+            transition: transform .2s;
+        }
+        .brush-size-slider:active::-moz-range-thumb {
+            cursor: grabbing;
+            transform: scale(1.15);
+        }
+        #fps-display {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            font-size: 12px;
+            font-weight: 400;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 2px 6px;
+            border-radius: 3px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .control-buttons {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .paused-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 20;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display:flex; align-items: center; gap:12px;"><span>沙箱模拟器 · 物理增强</span></div>
+        <div class="control-buttons">
+            <button class="icon-btn" onclick="togglePause()" title="暂停/继续">
+                <svg viewBox="0 0 24 24" id="pauseIcon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                <svg viewBox="0 0 24 24" id="playIcon" style="display:none;"><path d="M8 5v14l11-7z" /></svg>
+            </button>
+            <button class="icon-btn" onclick="clearCanvas()" title="清空">
+                <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+            </button>
+        </div>
+    </header>
+
+    <div id="game-container">
+        <canvas id="sandbox"></canvas>
+        <div id="fps-display">0 FPS</div>
+        <div class="paused-indicator" id="pausedIndicator">暂停中</div>
+    </div>
+
+    <div class="controls-area">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+            <span style="font-size:12px; opacity:.7">笔刷大小</span>
+            <input type="range" class="brush-size-slider" min="1" max="10" value="3" id="brushSize">
+        </div>
+        <div class="chip-scroll" id="quick-bar"></div>
+        <button class="icon-btn" style="width:100%; border-radius:12px; height:48px; background:var(--md-sys-color-primary); color:var(--md-sys-color-on-primary); margin-top:8px;"
+        onclick="toggleSheet(true)">更多元素</button>
+    </div>
+
+    <div class="backdrop" id="backdrop" onclick="toggleSheet(false)"></div>
+    <div id="more-sheet">
+        <div class="sheet-handle"></div>
+        <h3 style="margin:0 0 16px 0; font-size:20px;">所有元素</h3>
+        <div class="grid-elements" id="all-elements-grid"></div>
+    </div>
+
+    <script>
+        const CANVAS_SCALE = 4;
+        const TYPES = {
+            EMPTY: 0,
+            SOLID: 1,
+            POWDER: 2,
+            LIQUID: 3,
+            GAS: 4,
+            ACID: 5,
+            DUST: 6,
+            FUEL_GAS: 7,
+            HEAVY_SOLID: 8,
+            LAVA: 9,
+            STONE_SOLID: 10,
+            CLONE: 11,
+            LIGHT_POWDER: 12,
+            WET_POWDER: 13
+        };
+
+        const ELEMENTS = {
+            AIR: { id: 0, name: '空气', color: [0, 0, 0, 0], type: TYPES.EMPTY },
+            SAND: { id: 1, name: '沙子', color: [226, 197, 139, 255], type: TYPES.POWDER, variance: 20 },
+            WATER: { id: 2, name: '水', color: [79, 151, 232, 255], type: TYPES.LIQUID, variance: 10, reactsWithOil: true },
+            STONE: { id: 3, name: '石头', color: [119, 119, 119, 255], type: TYPES.STONE_SOLID },
+            WALL: { id: 4, name: '墙', color: [150, 150, 150, 255], type: TYPES.SOLID },
+            FIRE: { id: 5, name: '火焰', color: [255, 69, 0, 255], type: TYPES.GAS, variance: 50, life: 50 },
+            SMOKE: { id: 6, name: '烟雾', color: [200, 200, 200, 150], type: TYPES.GAS, life: 200 },
+            ACID: { id: 7, name: '酸液', color: [124, 252, 0, 200], type: TYPES.LIQUID, acidity: true },
+            WOOD: { id: 8, name: '木头', color: [139, 69, 19, 255], type: TYPES.SOLID, flammable: true },
+            PLANT: { id: 9, name: '植物', color: [34, 139, 34, 255], type: TYPES.SOLID, flammable: true },
+            OIL: { id: 10, name: '石油', color: [30, 30, 30, 255], type: TYPES.LIQUID, flammable: true, variance: 10,
+                reactsWithWater: true },
+            SEED: { id: 11, name: '种子', color: [139, 90, 43, 255], type: TYPES.POWDER, flammable: true },
+            DUST: { id: 12, name: '火药', color: [180, 150, 120, 255], type: TYPES.POWDER, explosive: true, variance: 15 },
+            GAS_FUEL: { id: 13, name: '燃气', color: [255, 213, 79, 180], type: TYPES.FUEL_GAS, variance: 25,
+            flammable: true },
+            ICE: { id: 14, name: '冰', color: [173, 216, 230, 255], type: TYPES.SOLID, meltable: true },
+            LAVA: { id: 15, name: '岩浆', color: [255, 80, 0, 255], type: TYPES.LAVA, hot: true, variance: 30 },
+            FLOWER: { id: 16, name: '花', color: [255, 105, 180, 255], type: TYPES.SOLID, flammable: true },
+            VINE: { id: 17, name: '藤蔓', color: [50, 205, 50, 180], type: TYPES.SOLID, flammable: true },
+            LEAF: { id: 18, name: '叶子', color: [144, 238, 144, 200], type: TYPES.SOLID, flammable: true },
+            CLONE: { id: 19, name: '克隆', color: [138, 43, 226, 255], type: TYPES.CLONE, clonePower: 5, pulse: true },
+            MUD: { id: 20, name: '泥浆', color: [120, 105, 85, 255], type: TYPES.WET_POWDER, variance: 12,
+                wetDrying: true },
+            ASH: { id: 21, name: '灰烬', color: [95, 90, 85, 180], type: TYPES.LIGHT_POWDER, variance: 8, lightWeight: true },
+            STEAM: { id: 22, name: '蒸汽', color: [225, 225, 235, 100], type: TYPES.GAS, variance: 15, life: 120,
+                condensable: true },
+            CHARCOAL: { id: 23, name: '木炭', color: [48, 42, 38, 255], type: TYPES.SOLID, flammable: true,
+                slowBurn: true },
+            DRY_MUD: { id: 24, name: '干泥块', color: [165, 155, 140, 255], type: TYPES.STONE_SOLID, rewettable: true },
+            ERASER: { id: 99, name: '橡皮擦', color: [255, 255, 255, 50], type: TYPES.SOLID, isEraser: true }
+        };
+
+        let currentElement = ELEMENTS.SAND;
+        let brushSize = 3;
+        const canvas = document.getElementById('sandbox');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        let width, height, grid, imageData, animationId;
+        let fps = 0,
+            frameCount = 0,
+            lastTime = performance.now();
+        const fpsUpdateInterval = 500;
+        const fpsDisplay = document.getElementById('fps-display');
+        let isPaused = false;
+
+        const PLACE_PROTECTION_FRAMES = 10;
+        let placeProtection = [];
+
+        const SEED_GROW_INTERVAL = 120;
+        const PLANT_ABSORB_INTERVAL = 150;
+        const VINE_GROW_INTERVAL = 100;
+        const CLONE_COPY_INTERVAL = 100;
+        const MUD_DRY_INTERVAL = 300;
+
+        let seedGrowth = { positions: [], heights: [], directions: [], maxHeights: [], growthTime: [] };
+        let plantWaterGrowth = { positions: [], waterCount: [], lastAbsorbTime: [], growDirections: [],
+            maxAbsorbCount: [] };
+        let vineGrowth = { positions: [], lastGrowTime: [], directions: [], spreadCount: [] };
+        let cloneElements = { positions: [], lastCopyTime: [], targetElements: [], copyCount: [], maxCopyCount: [] };
+        let mudDryTracker = { positions: [], lastWetTime: [] };
+
+        const GROWTH_LIMITS = {
+            SEED_MAX_HEIGHT: 30,
+            MAX_SEED_GROWTH_HEIGHT: 12,
+            MAX_ABSORB_COUNT: 10,
+            MAX_VINE_SPREAD: 8,
+            MAX_PLANT_HEIGHT: 25,
+            MAX_CLONE_COUNT: 100
+        };
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const pauseIcon = document.getElementById('pauseIcon');
+            const playIcon = document.getElementById('playIcon');
+            const pausedIndicator = document.getElementById('pausedIndicator');
+            if (isPaused) {
+                pauseIcon.style.display = 'none';
+                playIcon.style.display = 'block';
+                pausedIndicator.style.display = 'block';
+                cancelAnimationFrame(animationId);
+            } else {
+                pauseIcon.style.display = 'block';
+                playIcon.style.display = 'none';
+                pausedIndicator.style.display = 'none';
+                loop();
+            }
+        }
+
+        function initGame() {
+            const container = document.getElementById('game-container');
+            width = Math.floor(container.clientWidth / CANVAS_SCALE);
+            height = Math.floor(container.clientHeight / CANVAS_SCALE);
+            canvas.width = width;
+            canvas.height = height;
+            grid = new Array(width * height).fill(0);
+            placeProtection = new Uint8Array(width * height);
+            imageData = ctx.createImageData(width, height);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] = 0;
+                imageData.data[i + 1] = 0;
+                imageData.data[i + 2] = 0;
+                imageData.data[i + 3] = 255;
+            }
+            window.shockWave = new Uint8Array(width * height);
+            loop();
+        }
+
+        function saveToLocalStorage() {
+            const saveData = { grid: Array.from(grid), timestamp: Date.now() };
+            localStorage.setItem('sandboxSaveData', JSON.stringify(saveData));
+        }
+
+        function loadSavedState() {
+            const savedData = localStorage.getItem('sandboxSaveData');
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed.grid && parsed.grid.length === grid.length) {
+                        grid = parsed.grid;
+                    }
+                } catch (e) {
+                    console.log('加载保存数据失败');
+                }
+            }
+        }
+
+        const idx = (x, y) => x + y * width;
+        const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
+
+        const sparks = [];
+        class Spark {
+            constructor(x, y, vx, vy, restoreId = 0) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = 20;
+                this.restoreId = restoreId;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.2;
+                this.life--;
+                if (this.y >= height - 1 || this.life <= 0) {
+                    const ix = Math.floor(this.x),
+                        iy = Math.floor(this.y);
+                    if (inBounds(ix, iy)) {
+                        const i = idx(ix, iy);
+                        if (grid[i] === 0) {
+                            const el = Object.values(ELEMENTS).find(e => e.id === this.restoreId);
+                            if (el && (el.type === TYPES.LIQUID || el.type === TYPES.POWDER || el.type === TYPES
+                                    .HEAVY_SOLID || el.type === TYPES.WET_POWDER || el.type === TYPES.LIGHT_POWDER))
+                                grid[i] = this.restoreId;
+                            else grid[i] = ELEMENTS.FIRE.id;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        function addShockWave(cx, cy, r, strength) {
+            const r2 = r * r;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const tx = cx + dx,
+                        ty = cy + dy;
+                    if (!inBounds(tx, ty)) continue;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 > r2) continue;
+                    const i = idx(tx, ty);
+                    const s = Math.floor(strength * (1 - Math.sqrt(d2) / r));
+                    window.shockWave[i] = Math.min(255, window.shockWave[i] + s);
+                }
+            }
+        }
+
+        function decayShockWave() {
+            for (let i = 0; i < window.shockWave.length; i++) {
+                if (window.shockWave[i] > 0) window.shockWave[i] = Math.max(0, window.shockWave[i] - 8);
+            }
+        }
+
+        function checkSeedGrowth(x, y) {
+            const i = idx(x, y);
+            if (placeProtection[i] > 0) return;
+            const below = idx(x, y + 1);
+            if (y + 1 < height && (grid[below] === ELEMENTS.SAND.id ||
+                    grid[below] === ELEMENTS.PLANT.id ||
+                    grid[below] === ELEMENTS.VINE.id ||
+                    grid[below] === ELEMENTS.STONE.id ||
+                    grid[below] === ELEMENTS.MUD.id ||
+                    grid[below] === ELEMENTS.DRY_MUD.id)) {
+                const existingIdx = seedGrowth.positions.indexOf(i);
+                if (existingIdx === -1) {
+                    seedGrowth.positions.push(i);
+                    seedGrowth.heights.push(0);
+                    seedGrowth.directions.push(0);
+                    seedGrowth.maxHeights.push(8 + Math.floor(Math.random() * (GROWTH_LIMITS.MAX_SEED_GROWTH_HEIGHT - 8 +
+                        1)));
+                    seedGrowth.growthTime.push(performance.now());
+                }
+            }
+        }
+
+        function hasWaterNearby(x, y) {
+            const checks = [
+                [x, y + 1],
+                [x, y - 1],
+                [x + 1, y],
+                [x - 1, y],
+                [x + 1, y + 1],
+                [x - 1, y + 1],
+                [x + 1, y - 1],
+                [x - 1, y - 1]
+            ];
+            for (const [nx, ny] of checks) {
+                if (inBounds(nx, ny) && grid[idx(nx, ny)] === ELEMENTS.WATER.id) return true;
+            }
+            return false;
+        }
+
+        function updateSeedGrowth(now) {
+            for (let j = 0; j < seedGrowth.positions.length; j++) {
+                const pos = seedGrowth.positions[j];
+                if (placeProtection[pos] > 0) continue;
+                const lastTime = seedGrowth.growthTime[j];
+                const currentHeight = seedGrowth.heights[j];
+                const currentDir = seedGrowth.directions[j];
+                const maxHeight = seedGrowth.maxHeights[j];
+                const x = pos % width;
+                const y = Math.floor(pos / width);
+                const nearWater = hasWaterNearby(x, y);
+                const effectiveInterval = nearWater ? Math.floor(SEED_GROW_INTERVAL * 0.4) : SEED_GROW_INTERVAL;
+                const boostedMax = nearWater ? Math.min(maxHeight + 6, GROWTH_LIMITS.SEED_MAX_HEIGHT) : maxHeight;
+                seedGrowth.maxHeights[j] = boostedMax;
+
+                if (now - lastTime >= effectiveInterval && currentHeight < boostedMax) {
+                    if (y - currentHeight < 0) { seedGrowth.heights[j] = boostedMax; continue; }
+                    const growY = y - currentHeight - 1;
+                    if (growY >= 0) {
+                        const growIdx = idx(x, growY);
+                        if (placeProtection[growIdx] > 0) continue;
+                        let newDir = currentDir;
+                        if (Math.random() < 0.3) { newDir = Math.floor(Math.random() * 3) - 1; }
+                        const newX = Math.max(0, Math.min(width - 1, x + newDir));
+                        const finalGrowIdx = idx(newX, growY);
+                        if (placeProtection[finalGrowIdx] > 0) continue;
+                        if (grid[finalGrowIdx] === 0) {
+                            if (Math.random() < 0.7) {
+                                grid[finalGrowIdx] = ELEMENTS.PLANT.id;
+                                placeProtection[finalGrowIdx] = PLACE_PROTECTION_FRAMES;
+                            } else {
+                                grid[finalGrowIdx] = ELEMENTS.VINE.id;
+                                placeProtection[finalGrowIdx] = PLACE_PROTECTION_FRAMES;
+                                vineGrowth.positions.push(finalGrowIdx);
+                                vineGrowth.lastGrowTime.push(now);
+                                vineGrowth.directions.push(newDir);
+                                vineGrowth.spreadCount.push(0);
+                            }
+                            seedGrowth.heights[j] = currentHeight + 1;
+                            seedGrowth.directions[j] = newDir;
+                            seedGrowth.growthTime[j] = now;
+                            if (Math.random() < 0.2 && currentHeight > 3) {
+                                const leafDir = Math.random() > 0.5 ? 1 : -1;
+                                const leafX = Math.max(0, Math.min(width - 1, newX + leafDir));
+                                const leafIdx = idx(leafX, growY);
+                                if (inBounds(leafX, growY) && grid[leafIdx] === 0 && placeProtection[leafIdx] === 0) {
+                                    grid[leafIdx] = ELEMENTS.LEAF.id;
+                                    placeProtection[leafIdx] = PLACE_PROTECTION_FRAMES;
+                                }
+                            }
+                            if (seedGrowth.heights[j] === boostedMax) {
+                                grid[finalGrowIdx] = ELEMENTS.FLOWER.id;
+                                seedGrowth.positions.splice(j, 1);
+                                seedGrowth.heights.splice(j, 1);
+                                seedGrowth.directions.splice(j, 1);
+                                seedGrowth.maxHeights.splice(j, 1);
+                                seedGrowth.growthTime.splice(j, 1);
+                                j--;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkPlantWaterAbsorption(x, y) {
+            const i = idx(x, y);
+            if (placeProtection[i] > 0) return;
+            const elemId = grid[i];
+            if (elemId !== ELEMENTS.PLANT.id && elemId !== ELEMENTS.FLOWER.id && elemId !== ELEMENTS.VINE.id && elemId !==
+                ELEMENTS.LEAF.id) return;
+            const neighbors = [
+                [x, y + 1],
+                [x, y - 1],
+                [x + 1, y],
+                [x - 1, y]
+            ];
+            for (const [nx, ny] of neighbors) {
+                if (inBounds(nx, ny)) {
+                    const ni = idx(nx, ny);
+                    if (grid[ni] === ELEMENTS.WATER.id) {
+                        const existingIdx = plantWaterGrowth.positions.indexOf(i);
+                        if (existingIdx === -1) {
+                            plantWaterGrowth.positions.push(i);
+                            plantWaterGrowth.waterCount.push(1);
+                            plantWaterGrowth.lastAbsorbTime.push(performance.now());
+                            plantWaterGrowth.growDirections.push(Math.floor(Math.random() * 3) - 1);
+                            plantWaterGrowth.maxAbsorbCount.push(GROWTH_LIMITS.MAX_ABSORB_COUNT);
+                        } else {
+                            plantWaterGrowth.lastAbsorbTime[existingIdx] = performance.now();
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        function updatePlantWaterGrowth(now) {
+            for (let j = 0; j < plantWaterGrowth.positions.length; j++) {
+                const pos = plantWaterGrowth.positions[j];
+                if (placeProtection[pos] > 0) continue;
+                const lastTime = plantWaterGrowth.lastAbsorbTime[j];
+                const waterCount = plantWaterGrowth.waterCount[j];
+                const maxAbsorbCount = plantWaterGrowth.maxAbsorbCount[j];
+                if (waterCount >= maxAbsorbCount) {
+                    plantWaterGrowth.positions.splice(j, 1);
+                    plantWaterGrowth.waterCount.splice(j, 1);
+                    plantWaterGrowth.lastAbsorbTime.splice(j, 1);
+                    plantWaterGrowth.growDirections.splice(j, 1);
+                    plantWaterGrowth.maxAbsorbCount.splice(j, 1);
+                    j--;
+                    continue;
+                }
+                if (now - lastTime >= PLANT_ABSORB_INTERVAL) {
+                    const x = pos % width;
+                    const y = Math.floor(pos / width);
+                    let waterFound = false;
+                    const neighbors = [
+                        [x, y + 1],
+                        [x, y - 1],
+                        [x + 1, y],
+                        [x - 1, y]
+                    ];
+                    for (const [nx, ny] of neighbors) {
+                        if (inBounds(nx, ny)) {
+                            const ni = idx(nx, ny);
+                            if (grid[ni] === ELEMENTS.WATER.id) {
+                                waterFound = true;
+                                const existingIdx = plantWaterGrowth.positions.indexOf(ni);
+                                if (existingIdx === -1) {
+                                    plantWaterGrowth.positions.push(ni);
+                                    plantWaterGrowth.waterCount.push(1);
+                                    plantWaterGrowth.lastAbsorbTime.push(performance.now());
+                                    plantWaterGrowth.growDirections.push(Math.floor(Math.random() * 3) - 1);
+                                    plantWaterGrowth.maxAbsorbCount.push(GROWTH_LIMITS.MAX_ABSORB_COUNT);
+                                } else {
+                                    plantWaterGrowth.lastAbsorbTime[existingIdx] = performance.now();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!waterFound) {
+                        plantWaterGrowth.positions.splice(j, 1);
+                        plantWaterGrowth.waterCount.splice(j, 1);
+                        plantWaterGrowth.lastAbsorbTime.splice(j, 1);
+                        plantWaterGrowth.growDirections.splice(j, 1);
+                        plantWaterGrowth.maxAbsorbCount.splice(j, 1);
+                        j--;
+                    }
+                }
+            }
+        }
+
+        function updateVineGrowth(now) {
+            for (let j = 0; j < vineGrowth.positions.length; j++) {
+                const pos = vineGrowth.positions[j];
+                if (placeProtection[pos] > 0) continue;
+                const lastTime = vineGrowth.lastGrowTime[j];
+                const spreadCount = vineGrowth.spreadCount[j];
+                if (spreadCount >= GROWTH_LIMITS.MAX_VINE_SPREAD) {
+                    vineGrowth.positions.splice(j, 1);
+                    vineGrowth.lastGrowTime.splice(j, 1);
+                    vineGrowth.directions.splice(j, 1);
+                    vineGrowth.spreadCount.splice(j, 1);
+                    j--;
+                    continue;
+                }
+                if (now - lastTime >= VINE_GROW_INTERVAL) {
+                    const x = pos % width;
+                    const y = Math.floor(pos / width);
+                    const possibleDirections = [
+                        [x, y - 1, 0],
+                        [x - 1, y, -1],
+                        [x + 1, y, 1]
+                    ];
+                    const randomIndex = Math.floor(Math.random() * possibleDirections.length);
+                    const [newX, newY, newDir] = possibleDirections[randomIndex];
+                    if (inBounds(newX, newY)) {
+                        const newIdx = idx(newX, newY);
+                        if (placeProtection[newIdx] > 0) { vineGrowth.lastGrowTime[j] = now; continue; }
+                        if (grid[newIdx] === 0) {
+                            if (Math.random() < 0.5) {
+                                grid[newIdx] = ELEMENTS.VINE.id;
+                                placeProtection[newIdx] = PLACE_PROTECTION_FRAMES;
+                                vineGrowth.positions[j] = newIdx;
+                                vineGrowth.directions[j] = newDir;
+                                vineGrowth.spreadCount[j] = spreadCount + 1;
+                                vineGrowth.lastGrowTime[j] = now;
+                                if (Math.random() < 0.2) {
+                                    const leafDir = Math.random() > 0.5 ? 1 : -1;
+                                    const leafX = Math.max(0, Math.min(width - 1, newX + leafDir));
+                                    const leafIdx = idx(leafX, newY);
+                                    if (inBounds(leafX, newY) && grid[leafIdx] === 0 && placeProtection[leafIdx] === 0) {
+                                        grid[leafIdx] = ELEMENTS.LEAF.id;
+                                        placeProtection[leafIdx] = PLACE_PROTECTION_FRAMES;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    vineGrowth.lastGrowTime[j] = now;
+                }
+            }
+        }
+
+        function checkCloneElement(x, y) {
+            const i = idx(x, y);
+            const existingIdx = cloneElements.positions.indexOf(i);
+            if (existingIdx === -1) {
+                cloneElements.positions.push(i);
+                cloneElements.lastCopyTime.push(performance.now());
+                cloneElements.targetElements.push(0);
+                cloneElements.copyCount.push(0);
+                cloneElements.maxCopyCount.push(GROWTH_LIMITS.MAX_CLONE_COUNT);
+            }
+        }
+
+        function updateCloneElements(now) {
+            for (let j = 0; j < cloneElements.positions.length; j++) {
+                const pos = cloneElements.positions[j];
+                if (placeProtection[pos] > 0) continue;
+                const lastTime = cloneElements.lastCopyTime[j];
+                let targetElement = cloneElements.targetElements[j];
+                const copyCount = cloneElements.copyCount[j];
+                const maxCopyCount = cloneElements.maxCopyCount[j];
+                if (copyCount >= maxCopyCount) {
+                    cloneElements.positions.splice(j, 1);
+                    cloneElements.lastCopyTime.splice(j, 1);
+                    cloneElements.targetElements.splice(j, 1);
+                    cloneElements.copyCount.splice(j, 1);
+                    cloneElements.maxCopyCount.splice(j, 1);
+                    j--;
+                    continue;
+                }
+                if (now - lastTime >= CLONE_COPY_INTERVAL) {
+                    const x = pos % width;
+                    const y = Math.floor(pos / width);
+                    if (targetElement === 0) {
+                        const neighbors = [
+                            [x, y + 1],
+                            [x, y - 1],
+                            [x + 1, y],
+                            [x - 1, y],
+                            [x + 1, y + 1],
+                            [x - 1, y + 1],
+                            [x + 1, y - 1],
+                            [x - 1, y - 1]
+                        ];
+                        const nearbyElements = [];
+                        for (const [nx, ny] of neighbors) {
+                            if (inBounds(nx, ny)) {
+                                const ni = idx(nx, ny);
+                                const elemId = grid[ni];
+                                if (elemId !== 0 && elemId !== ELEMENTS.CLONE.id && elemId !== ELEMENTS.ERASER.id) {
+                                    nearbyElements.push(elemId);
+                                }
+                            }
+                        }
+                        if (nearbyElements.length > 0) {
+                            targetElement = nearbyElements[Math.floor(Math.random() * nearbyElements.length)];
+                            cloneElements.targetElements[j] = targetElement;
+                        } else { cloneElements.lastCopyTime[j] = now; continue; }
+                    }
+                    const emptySpots = [];
+                    const neighborOffsets = [
+                        [0, 1],
+                        [0, -1],
+                        [1, 0],
+                        [-1, 0],
+                        [1, 1],
+                        [-1, 1],
+                        [1, -1],
+                        [-1, -1]
+                    ];
+                    for (const [dx, dy] of neighborOffsets) {
+                        const nx = x + dx,
+                            ny = y + dy;
+                        if (inBounds(nx, ny)) {
+                            const ni = idx(nx, ny);
+                            if (grid[ni] === 0 || grid[ni] === ELEMENTS.SMOKE.id || grid[ni] === ELEMENTS.STEAM.id || grid[
+                                    ni] === ELEMENTS.GAS_FUEL.id) {
+                                emptySpots.push([nx, ny, ni]);
+                            }
+                        }
+                    }
+                    if (emptySpots.length > 0) {
+                        const numCopies = Math.min(emptySpots.length, Math.floor(Math.random() * 3) + 1);
+                        for (let k = 0; k < numCopies; k++) {
+                            if (emptySpots.length === 0) break;
+                            const randomIndex = Math.floor(Math.random() * emptySpots.length);
+                            const [copyX, copyY, copyIdx] = emptySpots[randomIndex];
+                            if (placeProtection[copyIdx] > 0) { emptySpots.splice(randomIndex, 1); continue; }
+                            grid[copyIdx] = targetElement;
+                            placeProtection[copyIdx] = PLACE_PROTECTION_FRAMES;
+                            emptySpots.splice(randomIndex, 1);
+                            cloneElements.copyCount[j]++;
+                            if (targetElement === ELEMENTS.SEED.id) checkSeedGrowth(copyX, copyY);
+                            if (targetElement === ELEMENTS.PLANT.id || targetElement === ELEMENTS.FLOWER.id || targetElement ===
+                                ELEMENTS.VINE.id || targetElement === ELEMENTS.LEAF.id) checkPlantWaterAbsorption(copyX,
+                                copyY);
+                        }
+                        cloneElements.lastCopyTime[j] = now;
+                    } else { cloneElements.lastCopyTime[j] = now; }
+                }
+            }
+        }
+
+        function updateMudDrying(now) {
+            for (let j = 0; j < mudDryTracker.positions.length; j++) {
+                const pos = mudDryTracker.positions[j];
+                const x = pos % width;
+                const y = Math.floor(pos / width);
+                if (grid[pos] !== ELEMENTS.MUD.id) {
+                    mudDryTracker.positions.splice(j, 1);
+                    mudDryTracker.lastWetTime.splice(j, 1);
+                    j--;
+                    continue;
+                }
+                if (hasWaterNearby(x, y)) {
+                    mudDryTracker.lastWetTime[j] = now;
+                } else if (now - mudDryTracker.lastWetTime[j] > MUD_DRY_INTERVAL) {
+                    if (Math.random() < 0.15) {
+                        grid[pos] = ELEMENTS.DRY_MUD.id;
+                        placeProtection[pos] = PLACE_PROTECTION_FRAMES;
+                        mudDryTracker.positions.splice(j, 1);
+                        mudDryTracker.lastWetTime.splice(j, 1);
+                        j--;
+                    }
+                }
+            }
+        }
+
+        function checkSandWaterReaction(x, y, i) {
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.SAND.id) return;
+            if (hasWaterNearby(x, y) && Math.random() < 0.12) {
+                grid[i] = ELEMENTS.MUD.id;
+                placeProtection[i] = PLACE_PROTECTION_FRAMES;
+                const existingIdx = mudDryTracker.positions.indexOf(i);
+                if (existingIdx === -1) {
+                    mudDryTracker.positions.push(i);
+                    mudDryTracker.lastWetTime.push(performance.now());
+                } else {
+                    mudDryTracker.lastWetTime[existingIdx] = performance.now();
+                }
+            }
+        }
+
+        function checkWaterOilReaction(x, y) {
+            const i = idx(x, y);
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.WATER.id) return;
+            const neighbors = [
+                [x, y + 1],
+                [x, y - 1],
+                [x + 1, y],
+                [x - 1, y]
+            ];
+            for (const [nx, ny] of neighbors) {
+                if (inBounds(nx, ny) && grid[idx(nx, ny)] === ELEMENTS.OIL.id && Math.random() < 0.15) {
+                    grid[i] = ELEMENTS.OIL.id;
+                    return;
+                }
+            }
+        }
+
+        function checkOilWaterReaction(x, y) {
+            const i = idx(x, y);
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.OIL.id) return;
+            const neighbors = [
+                [x, y + 1],
+                [x, y - 1],
+                [x + 1, y],
+                [x - 1, y]
+            ];
+            for (const [nx, ny] of neighbors) {
+                if (inBounds(nx, ny) && grid[idx(nx, ny)] === ELEMENTS.WATER.id && Math.random() < 0.2) {
+                    grid[idx(nx, ny)] = ELEMENTS.OIL.id;
+                    return;
+                }
+            }
+        }
+
+        function checkDustWaterReaction(x, y, i) {
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.DUST.id) return;
+            if (hasWaterNearby(x, y) && Math.random() < 0.08) {
+                grid[i] = ELEMENTS.MUD.id;
+                placeProtection[i] = PLACE_PROTECTION_FRAMES;
+                const existingIdx = mudDryTracker.positions.indexOf(i);
+                if (existingIdx === -1) {
+                    mudDryTracker.positions.push(i);
+                    mudDryTracker.lastWetTime.push(performance.now());
+                } else {
+                    mudDryTracker.lastWetTime[existingIdx] = performance.now();
+                }
+            }
+        }
+
+        function checkDryMudRewetting(x, y, i) {
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.DRY_MUD.id) return;
+            if (hasWaterNearby(x, y) && Math.random() < 0.06) {
+                grid[i] = ELEMENTS.MUD.id;
+                placeProtection[i] = PLACE_PROTECTION_FRAMES;
+                const existingIdx = mudDryTracker.positions.indexOf(i);
+                if (existingIdx === -1) {
+                    mudDryTracker.positions.push(i);
+                    mudDryTracker.lastWetTime.push(performance.now());
+                } else {
+                    mudDryTracker.lastWetTime[existingIdx] = performance.now();
+                }
+            }
+        }
+
+        function checkOilFireReaction(x, y, i) {
+            if (placeProtection[i] > 0) return;
+            if (grid[i] !== ELEMENTS.OIL.id) return;
+            const neighbors = [
+                [x, y + 1],
+                [x, y - 1],
+                [x + 1, y],
+                [x - 1, y],
+                [x + 1, y + 1],
+                [x - 1, y + 1],
+                [x + 1, y - 1],
+                [x - 1, y - 1]
+            ];
+            for (const [nx, ny] of neighbors) {
+                if (inBounds(nx, ny) && grid[idx(nx, ny)] === ELEMENTS.FIRE.id && Math.random() < 0.35) {
+                    grid[i] = ELEMENTS.FIRE.id;
+                    for (const [dx2, dy2] of neighbors) {
+                        const fx = x + dx2,
+                            fy = y + dy2;
+                        if (inBounds(fx, fy)) {
+                            const fi = idx(fx, fy);
+                            if (grid[fi] === 0 && Math.random() < 0.5) grid[fi] = ELEMENTS.FIRE.id;
+                            if (grid[fi] === 0 && Math.random() < 0.3) grid[fi] = ELEMENTS.SMOKE.id;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+
+        function update() {
+            if (isPaused) return;
+            for (let i = 0; i < placeProtection.length; i++) {
+                if (placeProtection[i] > 0) placeProtection[i]--;
+            }
+            decayShockWave();
+            const now = performance.now();
+            updateSeedGrowth(now);
+            updatePlantWaterGrowth(now);
+            updateVineGrowth(now);
+            updateCloneElements(now);
+            updateMudDrying(now);
+
+            for (let y = height - 1; y >= 0; y--) {
+                const startLeft = Math.random() > 0.5;
+                const xStart = startLeft ? 0 : width - 1;
+                const xEnd = startLeft ? width : -1;
+                const xStep = startLeft ? 1 : -1;
+                for (let x = xStart; x !== xEnd; x += xStep) {
+                    const i = idx(x, y);
+                    const id = grid[i];
+                    if (id === 0) continue;
+                    const elem = Object.values(ELEMENTS).find(e => e.id === id);
+                    if (!elem) continue;
+
+                    if (placeProtection[i] > 0) {
+                        if (elem.type === TYPES.POWDER) updatePowder(x, y, i);
+                        else if (elem.type === TYPES.WET_POWDER) updateWetPowder(x, y, i);
+                        else if (elem.type === TYPES.LIGHT_POWDER) updateLightPowder(x, y, i);
+                        else if (elem.type === TYPES.LIQUID && elem.id !== ELEMENTS.LAVA.id) updateLiquid(x, y, i, elem.id);
+                        continue;
+                    }
+
+                    checkSandWaterReaction(x, y, i);
+                    checkDustWaterReaction(x, y, i);
+                    checkDryMudRewetting(x, y, i);
+                    checkOilFireReaction(x, y, i);
+
+                    if (elem.id === ELEMENTS.SEED.id) checkSeedGrowth(x, y);
+                    if (elem.id === ELEMENTS.PLANT.id || elem.id === ELEMENTS.FLOWER.id || elem.id === ELEMENTS.VINE.id ||
+                        elem.id === ELEMENTS.LEAF.id) checkPlantWaterAbsorption(x, y);
+                    if (elem.id === ELEMENTS.CLONE.id) checkCloneElement(x, y);
+                    if (elem.id === ELEMENTS.WATER.id) checkWaterOilReaction(x, y);
+                    if (elem.id === ELEMENTS.OIL.id) checkOilWaterReaction(x, y);
+
+                    if (window.shockWave[i] > 60) {
+                        if (elem.explosive) { grid[i] = 0;
+                            doExplode(x, y, 4, 180); continue; }
+                        if (elem.flammable && Math.random() < 0.6 && elem.id !== ELEMENTS.LAVA.id) { grid[i] = ELEMENTS.FIRE
+                                .id; continue; }
+                        if (elem.meltable && Math.random() < 0.8) { grid[i] = ELEMENTS.WATER.id; continue; }
+                        if (elem.id === ELEMENTS.DRY_MUD.id && Math.random() < 0.5) { grid[i] = ELEMENTS.STONE.id; continue; }
+                    }
+                    if (elem.explosive) {
+                        const aroundFire = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0]
+                        ].some(([dx, dy]) => {
+                            const ni = idx(x + dx, y + dy);
+                            return inBounds(x + dx, y + dy) && grid[ni] === ELEMENTS.FIRE.id;
+                        });
+                        if (aroundFire) { grid[i] = 0;
+                            doExplode(x, y, 4, 180); continue; }
+                    }
+                    if (elem.id === ELEMENTS.FIRE.id) {
+                        if (Math.random() < 0.12) { grid[i] = ELEMENTS.SMOKE.id; continue; }
+                        const around = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0],
+                            [1, 1],
+                            [-1, 1],
+                            [1, -1],
+                            [-1, -1]
+                        ];
+                        for (let [dx, dy] of around) {
+                            const ni = idx(x + dx, y + dy);
+                            if (!inBounds(x + dx, y + dy)) continue;
+                            const neighborId = grid[ni];
+                            const neighbor = Object.values(ELEMENTS).find(e => e.id === neighborId);
+                            if (neighbor && neighbor.flammable && !neighbor.slowBurn && Math.random() < 0.25) {
+                                if (neighbor.id === ELEMENTS.WOOD.id && Math.random() < 0.3) {
+                                    const ashSpot = idx(x + dx, y + dy + 1);
+                                    if (inBounds(x + dx, y + dy + 1) && grid[ashSpot] === 0) grid[ashSpot] = ELEMENTS.ASH.id;
+                                    if (Math.random() < 0.15 && grid[ni] === ELEMENTS.WOOD.id) { grid[ni] = ELEMENTS.CHARCOAL
+                                            .id; continue; }
+                                }
+                                if ((neighbor.id === ELEMENTS.PLANT.id || neighbor.id === ELEMENTS.VINE.id || neighbor.id ===
+                                        ELEMENTS.LEAF.id || neighbor.id === ELEMENTS.FLOWER.id) && Math.random() < 0.35) {
+                                    const ashSpot = idx(x + dx, y + dy + 1);
+                                    if (inBounds(x + dx, y + dy + 1) && grid[ashSpot] === 0) grid[ashSpot] = ELEMENTS.ASH.id;
+                                }
+                                grid[ni] = ELEMENTS.FIRE.id;
+                            }
+                            if (neighbor && neighbor.slowBurn && Math.random() < 0.08) {
+                                grid[ni] = ELEMENTS.FIRE.id;
+                                const ashSpot = idx(x + dx, y + dy + 1);
+                                if (inBounds(x + dx, y + dy + 1) && grid[ashSpot] === 0) grid[ashSpot] = ELEMENTS.ASH.id;
+                            }
+                            if (neighbor && neighbor.meltable && Math.random() < 0.15) grid[ni] = ELEMENTS.WATER.id;
+                        }
+                        updateGas(x, y, i, elem.id);
+                        continue;
+                    }
+                    if (elem.id === ELEMENTS.SMOKE.id) {
+                        if (Math.random() < 0.012) { grid[i] = 0; continue; }
+                        if (Math.random() < 0.5) updateGas(x, y, i, elem.id);
+                        if (Math.random() < 0.4) { const dir = Math.random() > 0.5 ? 1 : -1;
+                            const si = idx(x + dir, y); if (inBounds(x + dir, y) && grid[si] === 0) swap(i, si); }
+                        continue;
+                    }
+                    if (elem.id === ELEMENTS.STEAM.id) {
+                        if (Math.random() < 0.025) { grid[i] = 0; continue; }
+                        const aroundCold = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0],
+                            [1, 1],
+                            [-1, 1],
+                            [1, -1],
+                            [-1, -1]
+                        ].some(([dx, dy]) => {
+                            const ni = idx(x + dx, y + dy);
+                            if (!inBounds(x + dx, y + dy)) return false;
+                            const nid = grid[ni];
+                            return nid === ELEMENTS.ICE.id || nid === ELEMENTS.STONE.id || nid === ELEMENTS.WALL
+                                .id || nid === ELEMENTS.DRY_MUD.id;
+                        });
+                        if (aroundCold && Math.random() < 0.3) { grid[i] = ELEMENTS.WATER.id; continue; }
+                        updateSteam(x, y, i);
+                        continue;
+                    }
+                    if (elem.acidity) {
+                        const around = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0]
+                        ];
+                        for (let [dx, dy] of around) {
+                            const ni = idx(x + dx, y + dy);
+                            if (inBounds(x + dx, y + dy) && grid[ni] && grid[ni] !== elem.id) {
+                                const targetElem = Object.values(ELEMENTS).find(e => e.id === grid[ni]);
+                                if (targetElem) {
+                                    if ((targetElem.id === ELEMENTS.PLANT.id || targetElem.id === ELEMENTS.VINE.id || targetElem
+                                            .id === ELEMENTS.LEAF.id || targetElem.id === ELEMENTS.FLOWER.id || targetElem.id ===
+                                            ELEMENTS.SEED.id) && Math.random() < 0.8) {
+                                        grid[ni] = 0;
+                                        if (Math.random() < 0.3) grid[i] = 0;
+                                        break;
+                                    }
+                                    if (targetElem.id === ELEMENTS.STONE.id && Math.random() < 0.04) {
+                                        grid[ni] = 0;
+                                        const smokeSpot = idx(x + dx, y + dy - 1);
+                                        if (inBounds(x + dx, y + dy - 1) && grid[smokeSpot] === 0) grid[smokeSpot] = ELEMENTS
+                                            .SMOKE.id;
+                                        if (Math.random() < 0.15) grid[i] = 0;
+                                        break;
+                                    }
+                                    if (targetElem.id === ELEMENTS.DRY_MUD.id && Math.random() < 0.12) {
+                                        grid[ni] = ELEMENTS.MUD.id;
+                                        if (Math.random() < 0.2) grid[i] = 0;
+                                        break;
+                                    }
+                                    if (targetElem.type === TYPES.LIQUID && targetElem.id !== ELEMENTS.LAVA.id && Math.random() <
+                                        0.1) { grid[ni] = 0; if (Math.random() < 0.3) grid[i] = 0; break; }
+                                    if (targetElem.id !== ELEMENTS.WALL.id && targetElem.id !== ELEMENTS.LAVA.id && Math.random() <
+                                        0.05) { grid[ni] = 0; if (Math.random() < 0.2) grid[i] = 0; break; }
+                                }
+                            }
+                        }
+                        updateLiquid(x, y, i, elem.id);
+                        continue;
+                    }
+                    if (elem.id === ELEMENTS.GAS_FUEL.id) {
+                        const aroundFire = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0]
+                        ].some(([dx, dy]) => {
+                            const ni = idx(x + dx, y + dy);
+                            return inBounds(x + dx, y + dy) && grid[ni] === ELEMENTS.FIRE.id;
+                        });
+                        if (aroundFire) {
+                            grid[i] = 0;
+                            for (let dy2 = -1; dy2 <= 1; dy2++) {
+                                for (let dx2 = -1; dx2 <= 1; dx2++) {
+                                    const tx = x + dx2,
+                                        ty = y + dy2;
+                                    if (!inBounds(tx, ty)) continue;
+                                    const ti = idx(tx, ty);
+                                    const target = grid[ti];
+                                    const targetElem = Object.values(ELEMENTS).find(e => e.id === target);
+                                    if (target === ELEMENTS.WALL.id) { grid[ti] = ELEMENTS.STONE.id; continue; }
+                                    if (target === 0 || !targetElem || targetElem.type !== TYPES.SOLID) {
+                                        const vx = (dx2 + Math.random() * 0.4 - 0.2) * 0.7;
+                                        const vy = (dy2 + Math.random() * 0.4 - 0.2) * 0.7 - 0.8;
+                                        sparks.push(new Spark(tx, ty, vx, vy, target));
+                                        if (grid[ti] === 0) grid[ti] = ELEMENTS.FIRE.id;
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        const dirs = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0]
+                        ];
+                        const [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+                        const ni = idx(x + dx, y + dy);
+                        if (inBounds(x + dx, y + dy)) {
+                            const tgt = grid[ni];
+                            const tgtEl = Object.values(ELEMENTS).find(e => e.id === tgt);
+                            if (tgt === 0 || tgtEl?.type === TYPES.LIQUID || tgtEl?.type === TYPES.POWDER) { swap(i, ni);
+                                continue; }
+                            const below = idx(x, y + 1);
+                            if (y + 1 < height) {
+                                const bEl = Object.values(ELEMENTS).find(e => e.id === grid[below]);
+                                if (bEl && (bEl.type === TYPES.LIQUID || bEl.type === TYPES.POWDER)) {
+                                    const up = idx(x, y - 1);
+                                    if (y - 1 >= 0 && grid[up] === 0) { swap(i, up); continue; }
+                                }
+                            }
+                        }
+                        if (Math.random() < 0.08) { const up = idx(x, y - 1); if (y - 1 >= 0 && (grid[up] === 0 ||
+                                isLiquid(grid[up]) || isWaterLike(grid[up]))) swap(i, up); }
+                        continue;
+                    }
+                    if (elem.meltable) {
+                        const aroundHot = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0],
+                            [1, 1],
+                            [-1, 1],
+                            [1, -1],
+                            [-1, -1]
+                        ].some(([dx, dy]) => {
+                            const ni = idx(x + dx, y + dy);
+                            if (!inBounds(x + dx, y + dy)) return false;
+                            const neighbor = Object.values(ELEMENTS).find(e => e.id === grid[ni]);
+                            return neighbor && (neighbor.id === ELEMENTS.FIRE.id || neighbor.id === ELEMENTS.LAVA.id);
+                        });
+                        if (aroundHot && Math.random() < 0.05) { grid[i] = ELEMENTS.WATER.id; continue; }
+                    }
+                    if (elem.id === ELEMENTS.LAVA.id) {
+                        if (Math.random() < 0.02) { const up = idx(x, y - 1); if (inBounds(x, y - 1) && grid[up] === 0) grid[
+                                up] = ELEMENTS.FIRE.id; }
+                        const around = [
+                            [0, 1],
+                            [0, -1],
+                            [1, 0],
+                            [-1, 0],
+                            [1, 1],
+                            [-1, 1],
+                            [1, -1],
+                            [-1, -1]
+                        ];
+                        for (let [dx, dy] of around) {
+                            const ni = idx(x + dx, y + dy);
+                            if (!inBounds(x + dx, y + dy)) continue;
+                            const neighbor = Object.values(ELEMENTS).find(e => e.id === grid[ni]);
+                            if (neighbor) {
+                                if (neighbor.explosive && neighbor.id !== ELEMENTS.LAVA.id) { grid[ni] = 0;
+                                    doExplode(x + dx, y + dy, 3, 120); } else if (neighbor.flammable && neighbor.id !== ELEMENTS
+                                    .LAVA.id && Math.random() < 0.8) { grid[ni] = ELEMENTS.FIRE.id; }
+                                if (neighbor.id === ELEMENTS.WATER.id && Math.random() < 0.5) {
+                                    grid[ni] = ELEMENTS.STONE.id;
+                                    const steamPos = idx(x + dx, y + dy - 1);
+                                    if (inBounds(x + dx, y + dy - 1) && grid[steamPos] === 0) grid[steamPos] = ELEMENTS.STEAM
+                                        .id;
+                                    const smokePos2 = idx(x + dx, y + dy - 2);
+                                    if (inBounds(x + dx, y + dy - 2) && grid[smokePos2] === 0) grid[smokePos2] = ELEMENTS
+                                        .SMOKE.id;
+                                }
+                                if (neighbor.id === ELEMENTS.ICE.id && Math.random() < 0.5) {
+                                    grid[ni] = ELEMENTS.WATER.id;
+                                    const steamPos = idx(x + dx, y + dy - 1);
+                                    if (inBounds(x + dx, y + dy - 1) && grid[steamPos] === 0) grid[steamPos] = ELEMENTS.STEAM
+                                        .id;
+                                }
+                                if (neighbor.id === ELEMENTS.MUD.id && Math.random() < 0.7) { grid[ni] = ELEMENTS.DRY_MUD.id; }
+                                if (neighbor.id === ELEMENTS.WOOD.id && Math.random() < 0.6) {
+                                    grid[ni] = ELEMENTS.CHARCOAL.id;
+                                    const ashSpot = idx(x + dx, y + dy + 1);
+                                    if (inBounds(x + dx, y + dy + 1) && grid[ashSpot] === 0) grid[ashSpot] = ELEMENTS.ASH.id;
+                                }
+                            }
+                        }
+                        updateLava(x, y, i);
+                        continue;
+                    }
+                    if (elem.id === ELEMENTS.STONE.id) {
+                        const below = idx(x, y + 1);
+                        if (y + 1 < height) {
+                            const belowElem = Object.values(ELEMENTS).find(e => e.id === grid[below]);
+                            if (grid[below] === 0 || (belowElem && (belowElem.type === TYPES.LIQUID || belowElem.type === TYPES
+                                    .GAS || belowElem.type === TYPES.FUEL_GAS))) { swap(i, below); continue; }
+                        }
+                        continue;
+                    }
+                    if (elem.id === ELEMENTS.CHARCOAL.id) {
+                        const below = idx(x, y + 1);
+                        if (y + 1 < height) {
+                            const belowElem = Object.values(ELEMENTS).find(e => e.id === grid[below]);
+                            if (grid[below] === 0 || (belowElem && (belowElem.type === TYPES.LIQUID || belowElem.type === TYPES
+                                    .GAS || belowElem.type === TYPES.FUEL_GAS))) { swap(i, below); continue; }
+                        }
+                        continue;
+                    }
+                    if (elem.type === TYPES.POWDER) updatePowder(x, y, i);
+                    else if (elem.type === TYPES.WET_POWDER) updateWetPowder(x, y, i);
+                    else if (elem.type === TYPES.LIGHT_POWDER) updateLightPowder(x, y, i);
+                    else if (elem.type === TYPES.LIQUID) updateLiquid(x, y, i, elem.id);
+                    else if (elem.type === TYPES.GAS) updateGas(x, y, i, elem.id);
+                    else if (elem.type === TYPES.HEAVY_SOLID) updateHeavySolid(x, y, i);
+                }
+            }
+            for (let i = sparks.length - 1; i >= 0; i--)
+                if (sparks[i].update()) sparks.splice(i, 1);
+            draw();
+            animationId = requestAnimationFrame(update);
+        }
+
+        function updateSteam(x, y, i) {
+            const above = idx(x, y - 1);
+            if (y - 1 >= 0 && (grid[above] === 0 || isLiquid(grid[above]) || isWaterLike(grid[above]))) { swap(i, above); return; }
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            const aboveSide = idx(x + dir, y - 1);
+            if (inBounds(x + dir, y - 1) && (grid[aboveSide] === 0 || isLiquid(grid[aboveSide]) || isWaterLike(grid[
+                aboveSide]))) swap(i, aboveSide);
+        }
+
+        function updateWetPowder(x, y, i) {
+            const below = idx(x, y + 1);
+            if (y + 1 < height && (grid[below] === 0 || isLiquid(grid[below]))) { swap(i, below); return; }
+            const side = Math.random() > 0.5 ? 1 : -1;
+            const diag = idx(x + side, y + 1);
+            if (inBounds(x + side, y + 1) && (grid[diag] === 0 || isLiquid(grid[diag]))) swap(i, diag);
+        }
+
+        function updateLightPowder(x, y, i) {
+            if (Math.random() < 0.4) {
+                const drift = Math.random() > 0.5 ? 1 : -1;
+                const side = idx(x + drift, y);
+                if (inBounds(x + drift, y) && grid[side] === 0) { swap(i, side); return; }
+            }
+            const below = idx(x, y + 1);
+            if (y + 1 < height && Math.random() < 0.55 && (grid[below] === 0 || isLiquid(grid[below]))) { swap(i, below); return; }
+            const side = Math.random() > 0.5 ? 1 : -1;
+            const diag = idx(x + side, y + 1);
+            if (inBounds(x + side, y + 1) && Math.random() < 0.4 && (grid[diag] === 0 || isLiquid(grid[diag]))) swap(i, diag);
+            if (Math.random() < 0.3) {
+                const rSide = Math.random() > 0.5 ? 1 : -1;
+                const rsi = idx(x + rSide, y);
+                if (inBounds(x + rSide, y) && grid[rsi] === 0) swap(i, rsi);
+            }
+        }
+
+        function updateLava(x, y, i) {
+            const below = idx(x, y + 1);
+            if (y + 1 < height) {
+                const belowElem = Object.values(ELEMENTS).find(e => e.id === grid[below]);
+                if (grid[below] === ELEMENTS.WATER.id) {
+                    grid[below] = ELEMENTS.STONE.id;
+                    const steamPos = idx(x, y);
+                    if (grid[steamPos] === ELEMENTS.LAVA.id) grid[steamPos] = ELEMENTS.STONE.id;
+                    const sp2 = idx(x, y - 1);
+                    if (inBounds(x, y - 1) && grid[sp2] === 0) grid[sp2] = ELEMENTS.STEAM.id;
+                    return;
+                } else if (grid[below] === 0 || (belowElem && (belowElem.type === TYPES.LIQUID || belowElem.type === TYPES
+                        .GAS || belowElem.type === TYPES.FUEL_GAS))) {
+                    const temp = grid[below];
+                    grid[below] = ELEMENTS.LAVA.id;
+                    grid[i] = 0;
+                    if (temp !== 0 && temp !== ELEMENTS.LAVA.id) {
+                        const dir = Math.random() > 0.5 ? 1 : -1;
+                        const side = idx(x + dir, y);
+                        if (inBounds(x + dir, y) && grid[side] === 0) grid[side] = temp;
+                    }
+                    return;
+                }
+            }
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            const sideA = idx(x + dir, y);
+            const sideB = idx(x - dir, y);
+            if (inBounds(x + dir, y)) {
+                const sideAElem = Object.values(ELEMENTS).find(e => e.id === grid[sideA]);
+                if (grid[sideA] === ELEMENTS.WATER.id) { grid[sideA] = ELEMENTS.STONE.id;
+                    grid[i] = ELEMENTS.STONE.id; return; } else if (grid[sideA] === 0 || (sideAElem && (sideAElem.type ===
+                        TYPES.LIQUID || sideAElem.type === TYPES.GAS || sideAElem.type === TYPES.FUEL_GAS))) {
+                    const temp = grid[sideA];
+                    grid[sideA] = ELEMENTS.LAVA.id;
+                    grid[i] = 0;
+                    if (temp !== 0 && temp !== ELEMENTS.LAVA.id) { const up = idx(x + dir, y - 1); if (inBounds(x + dir, y -
+                            1) && grid[up] === 0) grid[up] = temp; }
+                    return;
+                }
+            }
+            if (inBounds(x - dir, y)) {
+                const sideBElem = Object.values(ELEMENTS).find(e => e.id === grid[sideB]);
+                if (grid[sideB] === ELEMENTS.WATER.id) { grid[sideB] = ELEMENTS.STONE.id;
+                    grid[i] = ELEMENTS.STONE.id; return; } else if (grid[sideB] === 0 || (sideBElem && (sideBElem.type ===
+                        TYPES.LIQUID || sideBElem.type === TYPES.GAS || sideBElem.type === TYPES.FUEL_GAS))) {
+                    const temp = grid[sideB];
+                    grid[sideB] = ELEMENTS.LAVA.id;
+                    grid[i] = 0;
+                    if (temp !== 0 && temp !== ELEMENTS.LAVA.id) { const up = idx(x - dir, y - 1); if (inBounds(x - dir, y -
+                            1) && grid[up] === 0) grid[up] = temp; }
+                    return;
+                }
+            }
+            const diagA = idx(x + dir, y + 1);
+            const diagB = idx(x - dir, y + 1);
+            if (y + 1 < height) {
+                if (inBounds(x + dir, y + 1) && (grid[diagA] === 0 || grid[diagA] === ELEMENTS.WATER.id)) {
+                    if (grid[diagA] === ELEMENTS.WATER.id) grid[diagA] = ELEMENTS.STONE.id;
+                    else { grid[diagA] = ELEMENTS.LAVA.id;
+                        grid[i] = 0; }
+                    return;
+                }
+                if (inBounds(x - dir, y + 1) && (grid[diagB] === 0 || grid[diagB] === ELEMENTS.WATER.id)) {
+                    if (grid[diagB] === ELEMENTS.WATER.id) grid[diagB] = ELEMENTS.STONE.id;
+                    else { grid[diagB] = ELEMENTS.LAVA.id;
+                        grid[i] = 0; }
+                    return;
+                }
+            }
+        }
+
+        function updateHeavySolid(x, y, i) {
+            const below = idx(x, y + 1);
+            if (y + 1 < height && grid[below] === 0) swap(i, below);
+        }
+
+        function doExplode(cx, cy, r, strength) {
+            addShockWave(cx, cy, r, strength);
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const tx = cx + dx,
+                        ty = cy + dy;
+                    if (!inBounds(tx, ty)) continue;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 > r * r) continue;
+                    const ti = idx(tx, ty);
+                    const target = grid[ti];
+                    const tgtEl = Object.values(ELEMENTS).find(e => e.id === target);
+                    if (!tgtEl) continue;
+                    if (target === ELEMENTS.WALL.id) { grid[ti] = ELEMENTS.STONE.id; continue; }
+                    if (target === 0 || tgtEl.type === TYPES.LIQUID || tgtEl.type === TYPES.POWDER || tgtEl.type === TYPES
+                        .WET_POWDER || tgtEl.type === TYPES.LIGHT_POWDER) {
+                        const vx = (dx + Math.random() * 0.4 - 0.2) * 0.8;
+                        const vy = (dy + Math.random() * 0.4 - 0.2) * 0.8 - 1;
+                        sparks.push(new Spark(tx, ty, vx, vy, target));
+                        if (grid[ti] === 0) grid[ti] = ELEMENTS.FIRE.id;
+                    }
+                }
+            }
+        }
+
+        function updatePowder(x, y, i) {
+            const below = idx(x, y + 1);
+            if (y + 1 < height && (grid[below] === 0 || isLiquid(grid[below]))) { swap(i, below); return; }
+            const side = Math.random() > 0.5 ? 1 : -1;
+            const diag = idx(x + side, y + 1);
+            if (inBounds(x + side, y + 1) && (grid[diag] === 0 || isLiquid(grid[diag]))) swap(i, diag);
+        }
+
+        function updateLiquid(x, y, i, typeId) {
+            if (typeId === ELEMENTS.LAVA.id) return;
+            const below = idx(x, y + 1);
+            if (y + 1 < height && grid[below] === 0) { swap(i, below); return; }
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            const sideA = idx(x + dir, y);
+            const sideB = idx(x - dir, y);
+            if (inBounds(x + dir, y) && grid[sideA] === 0) swap(i, sideA);
+            else if (inBounds(x - dir, y) && grid[sideB] === 0) swap(i, sideB);
+        }
+
+        function updateGas(x, y, i, typeId) {
+            const above = idx(x, y - 1);
+            if (y - 1 >= 0 && (grid[above] === 0 || isLiquid(grid[above]) || isWaterLike(grid[above]))) { swap(i, above); } else {
+                const dir = Math.random() > 0.5 ? 1 : -1;
+                const aboveSide = idx(x + dir, y - 1);
+                if (inBounds(x + dir, y - 1) && (grid[aboveSide] === 0 || isLiquid(grid[aboveSide]) || isWaterLike(grid[
+                        aboveSide]))) swap(i, aboveSide);
+            }
+        }
+
+        function isLiquid(id) {
+            const e = Object.values(ELEMENTS).find(el => el.id === id);
+            return e && (e.type === TYPES.LIQUID || e.type === TYPES.LAVA);
+        }
+
+        function isWaterLike(id) {
+            return id === ELEMENTS.WATER.id || id === ELEMENTS.OIL.id || id === ELEMENTS.ACID.id || id === ELEMENTS.SEED.id ||
+                id === ELEMENTS.STEAM.id;
+        }
+
+        function swap(i, j) { const t = grid[i];
+            grid[i] = grid[j];
+            grid[j] = t; }
+
+        function updateFPS() {
+            frameCount++;
+            const currentTime = performance.now();
+            const elapsed = currentTime - lastTime;
+            if (elapsed >= fpsUpdateInterval) {
+                fps = Math.round((frameCount * 1000) / elapsed);
+                frameCount = 0;
+                lastTime = currentTime;
+                fpsDisplay.textContent = 'FPS：' + fps;
+            }
+        }
+
+        function draw() {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) { data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+                data[i + 3] = 255; }
+            for (let i = 0; i < grid.length; i++) {
+                const id = grid[i];
+                const p = i * 4;
+                if (id === 0) continue;
+                const el = Object.values(ELEMENTS).find(e => e.id === id);
+                if (el) {
+                    let r = el.color[0],
+                        g = el.color[1],
+                        b = el.color[2];
+                    const v = el.variance ? (Math.random() * el.variance - el.variance / 2) : 0;
+                    r = clamp(r + v);
+                    g = clamp(g + v);
+                    b = clamp(b + v);
+                    if (el.id === ELEMENTS.LAVA.id) {
+                        const pulse = Math.sin(performance.now() * 0.005) * 15;
+                        r = clamp(r + pulse);
+                        g = clamp(g + pulse * 0.5);
+                        const glowRadius = 1,
+                            x = i % width,
+                            y = Math.floor(i / width);
+                        for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+                            for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+                                if (dx === 0 && dy === 0) continue;
+                                const nx = x + dx,
+                                    ny = y + dy;
+                                if (inBounds(nx, ny)) {
+                                    const ni = idx(nx, ny);
+                                    const np = ni * 4;
+                                    const glowStrength = 0.4;
+                                    data[np] = Math.min(255, data[np] + r * glowStrength);
+                                    data[np + 1] = Math.min(255, data[np + 1] + g * glowStrength);
+                                    data[np + 2] = Math.min(255, data[np + 2] + b * glowStrength * 0.3);
+                                }
+                            }
+                        }
+                    } else if (el.id === ELEMENTS.FLOWER.id) {
+                        const pulse = Math.sin(performance.now() * 0.01) * 15;
+                        r = clamp(r + pulse);
+                        g = clamp(g + pulse * 0.3);
+                    } else if (el.id === ELEMENTS.VINE.id || el.id === ELEMENTS.LEAF.id) {
+                        const pulse = Math.sin(performance.now() * 0.003 + i * 0.01) * 5;
+                        r = clamp(r + pulse * 0.5);
+                        g = clamp(g + pulse);
+                    } else if (el.id === ELEMENTS.CLONE.id) {
+                        const pulse = Math.sin(performance.now() * 0.008) * 30;
+                        r = clamp(r + pulse);
+                        g = clamp(g - pulse * 0.3);
+                        b = clamp(b + pulse * 0.5);
+                        const glowRadius = 1,
+                            x = i % width,
+                            y = Math.floor(i / width);
+                        for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+                            for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+                                if (dx === 0 && dy === 0) continue;
+                                const nx = x + dx,
+                                    ny = y + dy;
+                                if (inBounds(nx, ny)) {
+                                    const ni = idx(nx, ny);
+                                    const np = ni * 4;
+                                    const glowStrength = 0.2;
+                                    data[np] = Math.min(255, data[np] + r * glowStrength);
+                                    data[np + 1] = Math.min(255, data[np + 1] + g * glowStrength);
+                                    data[np + 2] = Math.min(255, data[np + 2] + b * glowStrength);
+                                }
+                            }
+                        }
+                    } else if (el.id === ELEMENTS.STEAM.id) {
+                        const pulse = Math.sin(performance.now() * 0.015 + i * 0.02) * 8;
+                        r = clamp(r + pulse);
+                        g = clamp(g + pulse);
+                        b = clamp(b + pulse);
+                    } else if (el.id === ELEMENTS.MUD.id) {
+                        const wetShine = Math.sin(performance.now() * 0.006 + i * 0.01) * 6;
+                        r = clamp(r + wetShine * 0.6);
+                        g = clamp(g + wetShine * 0.4);
+                        b = clamp(b + wetShine * 0.2);
+                    }
+                    data[p] = r;
+                    data[p + 1] = g;
+                    data[p + 2] = b;
+                    data[p + 3] = el.color[3] !== undefined ? el.color[3] : 255;
+                }
+            }
+            for (const s of sparks) {
+                const sx = Math.floor(s.x),
+                    sy = Math.floor(s.y);
+                if (inBounds(sx, sy)) {
+                    const i = idx(sx, sy);
+                    const p = i * 4;
+                    data[p] = 255;
+                    data[p + 1] = 200;
+                    data[p + 2] = 0;
+                    data[p + 3] = 255;
+                }
+            }
+            for (let i = 0; i < window.shockWave.length; i++) {
+                if (window.shockWave[i] > 30) {
+                    const px = (i % width) * 4;
+                    const py = Math.floor(i / width) * 4;
+                    const base = (py * width + px) * 4;
+                    const waveIntensity = window.shockWave[i] / 255;
+                    data[base] = Math.min(255, data[base] + 255 * waveIntensity);
+                    data[base + 1] = Math.min(255, data[base + 1] + 200 * waveIntensity);
+                    data[base + 2] = Math.min(255, data[base + 2] + 100 * waveIntensity);
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            updateFPS();
+        }
+
+        const clamp = v => Math.max(0, Math.min(255, v));
+
+        function loop() { update(); }
+
+        function clearCanvas() {
+            grid.fill(0);
+            placeProtection.fill(0);
+            sparks.length = 0;
+            window.shockWave.fill(0);
+            seedGrowth.positions = [];
+            seedGrowth.heights = [];
+            seedGrowth.directions = [];
+            seedGrowth.maxHeights = [];
+            seedGrowth.growthTime = [];
+            plantWaterGrowth.positions = [];
+            plantWaterGrowth.waterCount = [];
+            plantWaterGrowth.lastAbsorbTime = [];
+            plantWaterGrowth.growDirections = [];
+            plantWaterGrowth.maxAbsorbCount = [];
+            vineGrowth.positions = [];
+            vineGrowth.lastGrowTime = [];
+            vineGrowth.directions = [];
+            vineGrowth.spreadCount = [];
+            cloneElements.positions = [];
+            cloneElements.lastCopyTime = [];
+            cloneElements.targetElements = [];
+            cloneElements.copyCount = [];
+            cloneElements.maxCopyCount = [];
+            mudDryTracker.positions = [];
+            mudDryTracker.lastWetTime = [];
+        }
+
+        let isDrawing = false;
+
+        function getGridPos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const [cx, cy] = evt.touches && evt.touches.length ? [evt.touches[0].clientX, evt.touches[0].clientY] : [evt
+                .clientX, evt.clientY
+            ];
+            return {
+                x: Math.floor((cx - rect.left) / rect.width * width),
+                y: Math.floor((cy - rect.top) / rect.height * height)
+            };
+        }
+
+        function paint(evt) {
+            if (!isDrawing || isPaused) return;
+            const { x, y } = getGridPos(evt);
+            const r = parseInt(document.getElementById('brushSize').value);
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (dx * dx + dy * dy <= r * r) {
+                        const px = x + dx,
+                            py = y + dy;
+                        if (!inBounds(px, py)) continue;
+                        const i = idx(px, py);
+                        if (currentElement.isEraser) { grid[i] = 0;
+                            placeProtection[i] = 0; } else {
+                            if (grid[i] === 0) {
+                                grid[i] = currentElement.id;
+                                placeProtection[i] = PLACE_PROTECTION_FRAMES;
+                                if (currentElement.id === ELEMENTS.MUD.id) {
+                                    const existingIdx = mudDryTracker.positions.indexOf(i);
+                                    if (existingIdx === -1) {
+                                        mudDryTracker.positions.push(i);
+                                        mudDryTracker.lastWetTime.push(performance.now());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        canvas.addEventListener('mousedown', e => { isDrawing = true;
+            paint(e); });
+        window.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mousemove', paint);
+        canvas.addEventListener('touchstart', e => { isDrawing = true;
+            paint(e);
+            e.preventDefault(); }, { passive: false });
+        window.addEventListener('touchend', () => isDrawing = false);
+        canvas.addEventListener('touchmove', e => { paint(e);
+            e.preventDefault(); }, { passive: false });
+
+        window.addEventListener('beforeunload', saveToLocalStorage);
+        setInterval(saveToLocalStorage, 10000);
+
+        function selectElement(key) {
+            currentElement = ELEMENTS[key];
+            updateUI();
+            toggleSheet(false);
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.key === getKeyByValue(currentElement));
+            });
+        }
+
+        function getKeyByValue(obj) {
+            return Object.keys(ELEMENTS).find(k => ELEMENTS[k] === obj);
+        }
+
+        function toggleSheet(open) {
+            document.getElementById('more-sheet').classList.toggle('open', open);
+            document.getElementById('backdrop').classList.toggle('open', open);
+        }
+
+        function initUI() {
+            const quickBar = document.getElementById('quick-bar');
+            const allGrid = document.getElementById('all-elements-grid');
+            const quickKeys = ['SAND', 'WATER', 'STONE', 'WALL', 'ICE', 'LAVA', 'WOOD', 'SEED', 'CLONE', 'ERASER'];
+            quickKeys.forEach(key => {
+                const el = ELEMENTS[key];
+                const btn = document.createElement('button');
+                btn.className = 'chip';
+                btn.dataset.key = key;
+                btn.innerText = el.name;
+                btn.onclick = e => { selectElement(key); };
+                if (key === 'SAND') btn.classList.add('active');
+                quickBar.appendChild(btn);
+            });
+            Object.keys(ELEMENTS).forEach(key => {
+                if (key === 'AIR') return;
+                const el = ELEMENTS[key];
+                const card = document.createElement('div');
+                card.className = 'element-card';
+                card.onclick = e => { selectElement(key); };
+                const dot = document.createElement('div');
+                dot.className = 'element-color-dot';
+                if (el.isEraser) {
+                    dot.style.background = '#fff';
+                    dot.style.border = '2px solid #ccc';
+                    dot.style.backgroundImage =
+                        'linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc)';
+                    dot.style.backgroundSize = '10px 10px';
+                    dot.style.backgroundPosition = '0 0, 5px 5px';
+                } else {
+                    if (el.id === ELEMENTS.LAVA.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',1)';
+                        dot.style.boxShadow = '0 0 8px rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] +
+                            ',0.9)';
+                    } else if (el.id === ELEMENTS.FLOWER.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',1)';
+                        dot.style.boxShadow = '0 0 6px rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] +
+                            ',0.8)';
+                    } else if (el.id === ELEMENTS.VINE.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',0.7)';
+                        dot.style.border = '1px solid rgba(0,0,0,0.2)';
+                    } else if (el.id === ELEMENTS.LEAF.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',0.8)';
+                        dot.style.border = '1px solid rgba(0,0,0,0.1)';
+                    } else if (el.id === ELEMENTS.CLONE.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',1)';
+                        dot.style.boxShadow = '0 0 6px rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] +
+                            ',0.8)';
+                        dot.style.animation = 'pulse 2s infinite';
+                    } else if (el.id === ELEMENTS.MUD.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',1)';
+                        dot.style.boxShadow = 'inset 0 0 4px rgba(0,0,0,0.3)';
+                    } else if (el.id === ELEMENTS.STEAM.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] +
+                            ',0.6)';
+                        dot.style.border = '1px dashed rgba(255,255,255,0.5)';
+                    } else if (el.id === ELEMENTS.ASH.id) {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] +
+                            ',0.7)';
+                        dot.style.border = '1px dotted rgba(0,0,0,0.3)';
+                    } else {
+                        dot.style.backgroundColor = 'rgba(' + el.color[0] + ',' + el.color[1] + ',' + el.color[2] + ',1)';
+                    }
+                }
+                const name = document.createElement('span');
+                name.style.fontSize = '14px';
+                name.innerText = el.name;
+                card.appendChild(dot);
+                card.appendChild(name);
+                allGrid.appendChild(card);
+            });
+            const style = document.createElement('style');
+            style.textContent =
+                '@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}';
+            document.head.appendChild(style);
+        }
+
+        window.addEventListener('load', () => {
+            initGame();
+            initUI();
+            loadSavedState();
+        });
+    </script>
+</body>
+</html>
